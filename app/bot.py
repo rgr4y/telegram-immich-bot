@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
 BOT_NAME = "Telegram to Immich Bot"
-BOT_VERSION = "0.6"
+BOT_VERSION = "0.7"
 
 def validate_config():
     """Validate required environment variables."""

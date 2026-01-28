@@ -1,4 +1,4 @@
-FROM python:3.13-alpine
+FROM python:3.14-alpine
 
 LABEL org.opencontainers.image.title="Telegram to Immich bot"
 LABEL org.opencontainers.image.description="Telegram bot to upload files directly to your Immich instance"
@@ -10,6 +10,8 @@ LABEL org.opencontainers.image.licenses="AGPL-3.0-or-later"
 
 WORKDIR /app
 
+RUN apk add --no-cache tiff-dev openjpeg-dev
+
 RUN apk add --no-cache --virtual .build-deps \
     gcc \
     musl-dev \
@@ -19,10 +21,8 @@ RUN apk add --no-cache --virtual .build-deps \
     openssl-dev \
     postgresql-dev \
     libwebp-dev \
-    tiff-dev \
     freetype-dev \
     lcms2-dev \
-    openjpeg-dev \
     harfbuzz-dev \
     && apk add --no-cache \
     ffmpeg \

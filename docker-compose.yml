@@ -9,4 +9,8 @@ services:
       - ALLOWED_USER_IDS=
       - TZ=America/Los_Angeles
     image: ghcr.io/rgr4y/telegram-immich-bot
-    build: .
+    build:
+      context: .
+      platforms:
+        - linux/amd64
+    restart: unless-stopped

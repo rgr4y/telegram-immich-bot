@@ -1,0 +1,8 @@
+env.sh
+.env
+venv/
+__pycache__/
+.git/
+.DS_Store
+run_dev.sh
+*.pyc

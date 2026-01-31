@@ -3,9 +3,10 @@ services:
   telegram-immich-bot:
     container_name: telegram-immich-bot
     environment:
-      - IMMICH_API_URL=https://immich.tld/api
-      - IMMICH_API_KEY=xxxxxxxxxx
-      - TELEGRAM_BOT_TOKEN=xxx:xxxxxxxxxxx
-      - ALLOWED_USER_IDS=xxxxxx
-      - TZ=Europe/Madrid
-    image: ghcr.io/myanesp/telegram-immich-bot
+      - IMMICH_API_URL=
+      - IMMICH_API_KEY=
+      - TELEGRAM_BOT_TOKEN=
+      - ALLOWED_USER_IDS=
+      - TZ=America/Los_Angeles
+    image: ghcr.io/rgr4y/telegram-immich-bot
+    build: .

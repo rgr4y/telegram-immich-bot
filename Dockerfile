@@ -10,28 +10,22 @@ LABEL org.opencontainers.image.licenses="AGPL-3.0-or-later"
 
 WORKDIR /app
 
-RUN apk add --no-cache tiff-dev openjpeg-dev
+COPY app/ /app
 
-RUN apk add --no-cache --virtual .build-deps \
+RUN apk add --no-cache tiff-dev openjpeg-dev \
+    && apk add --no-cache --virtual .build-deps \
     gcc \
     musl-dev \
     libjpeg-turbo-dev \
     zlib-dev \
     libffi-dev \
     openssl-dev \
-    postgresql-dev \
     libwebp-dev \
     freetype-dev \
     lcms2-dev \
     harfbuzz-dev \
-    && apk add --no-cache \
-    ffmpeg \
-    && pip install --no-cache-dir --upgrade pip
-
-COPY app/ /app
-
-RUN pip install --no-cache-dir -r requirements.txt
-
-RUN apk del .build-deps
+    && pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir -r requirements.txt \
+    && apk del .build-deps
 
 CMD ["python", "bot.py"]

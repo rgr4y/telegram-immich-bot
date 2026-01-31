@@ -1,31 +1,25 @@
-FROM python:3.14-alpine
-
-LABEL org.opencontainers.image.title="Telegram to Immich bot"
-LABEL org.opencontainers.image.description="Telegram bot to upload files directly to your Immich instance"
-LABEL org.opencontainers.image.authors="Mario Yanes <mario.yanes@uc3m.es> (@myanesp)"
-LABEL org.opencontainers.image.url=https://github.com/myanesp/telegram-immich-bot/blob/main/README.md
-LABEL org.opencontainers.image.documentation=https://github.com/myanesp/telegram-immich-bot
-LABEL org.opencontainers.image.source="https://github.com/myanesp/telegram-immich-bot"
-LABEL org.opencontainers.image.licenses="AGPL-3.0-or-later"
-
+FROM python:3.13-slim
 WORKDIR /app
+
+# runtime libs
+RUN apt-get update && apt-get install -y --no-install-recommends \
+  zlib1g libjpeg62-turbo libwebp7 libtiff6 libopenjp2-7 \
+  && rm -rf /var/lib/apt/lists/*
+
+# build deps (temporary)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+  build-essential python3-dev \
+  zlib1g-dev libjpeg62-turbo-dev libwebp-dev libtiff-dev libopenjp2-7-dev \
+  && rm -rf /var/lib/apt/lists/*
 
 COPY app/ /app
 
-RUN apk add --no-cache tiff-dev openjpeg-dev \
-    && apk add --no-cache --virtual .build-deps \
-    gcc \
-    musl-dev \
-    libjpeg-turbo-dev \
-    zlib-dev \
-    libffi-dev \
-    openssl-dev \
-    libwebp-dev \
-    freetype-dev \
-    lcms2-dev \
-    harfbuzz-dev \
-    && pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir -r requirements.txt \
-    && apk del .build-deps
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+# remove build deps
+RUN apt-get purge -y --auto-remove \
+  build-essential python3-dev \
+  zlib1g-dev libjpeg62-turbo-dev libwebp-dev libtiff-dev libopenjp2-7-dev
 
 CMD ["python", "bot.py"]

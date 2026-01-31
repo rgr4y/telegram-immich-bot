@@ -11,6 +11,5 @@ services:
     image: ghcr.io/rgr4y/telegram-immich-bot
     build:
       context: .
-      platforms:
-        - linux/amd64
     restart: unless-stopped
+

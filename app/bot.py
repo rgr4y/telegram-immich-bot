@@ -44,6 +44,7 @@ def validate_config():
 IMMICH_API_URL = os.getenv("IMMICH_API_URL", "http://your-immich-instance.ltd/api")
 IMMICH_API_KEY = os.getenv("IMMICH_API_KEY", "")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_API_URL = os.getenv("TELEGRAM_API_URL") # Optional, for local bot api server
 
 allowed_user_ids = os.getenv("ALLOWED_USER_IDS")
 if not allowed_user_ids:
@@ -59,6 +60,9 @@ SUPPORTED_FILE_TYPES = (
     "Images: JPG, PNG, GIF, BMP, TIFF, HEIC, WEBP\n"
     "Videos: MP4, MOV, AVI, MKV, WEBM, 3GP"
 )
+
+# 20MB for Cloud API, 2GB (2000MB) for Local API
+MAX_FILE_SIZE = (2000 * 1024 * 1024) if TELEGRAM_API_URL else (20 * 1024 * 1024)
 
 def get_file_type(file_path):
     """Determine file type based on extension and MIME type."""
@@ -384,6 +388,12 @@ async def handle_document(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         document = update.message.document
+        
+        if document.file_size and document.file_size > MAX_FILE_SIZE:
+             logger.warning(f"File {file_name} is too big: {document.file_size} bytes")
+             await update.message.reply_text(f"❌ File is too big. Maximum size is {MAX_FILE_SIZE // (1024*1024)}MB due to Telegram Bot API limits.")
+             return
+
         file_id = document.file_id
         temp_file_path = f"/tmp/{file_id}_{file_name}"
 
@@ -426,6 +436,12 @@ async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
     username = update.message.from_user.username or update.message.from_user.first_name
     photo = update.message.photo[-1]
+    
+    if photo.file_size and photo.file_size > MAX_FILE_SIZE:
+         logger.warning(f"Photo is too big: {photo.file_size} bytes")
+         await update.message.reply_text(f"❌ Photo is too big. Maximum size is {MAX_FILE_SIZE // (1024*1024)}MB due to Telegram Bot API limits.")
+         return
+
     file_id = photo.file_id
     file_name = f"photo_{file_id}.jpg"
 
@@ -477,6 +493,12 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     video = update.message.video
+
+    if video.file_size and video.file_size > MAX_FILE_SIZE:
+         logger.warning(f"Video is too big: {video.file_size} bytes")
+         await update.message.reply_text(f"❌ Video is too big. Maximum size is {MAX_FILE_SIZE // (1024*1024)}MB due to Telegram Bot API limits.")
+         return
+
     file_id = video.file_id
     # Use file_name if available, otherwise generate one
     file_name = getattr(video, 'file_name', None) or f"video_{file_id}.mp4"
@@ -534,7 +556,13 @@ def main():
 
         # logging is already configured at module level
 
-        application = Application.builder().token(TELEGRAM_BOT_TOKEN).post_stop(send_shutdown_message).build()
+        builder = Application.builder().token(TELEGRAM_BOT_TOKEN).post_stop(send_shutdown_message)
+        
+        if TELEGRAM_API_URL:
+            builder.base_url(TELEGRAM_API_URL)
+            logger.info(f"Using local Telegram API URL: {TELEGRAM_API_URL}")
+            
+        application = builder.build()
 
         application.add_handler(CommandHandler("start", start))
         application.add_handler(CommandHandler("help", help_command))

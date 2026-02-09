@@ -2,14 +2,29 @@
 services:
   telegram-immich-bot:
     container_name: telegram-immich-bot
-    environment:
-      - IMMICH_API_URL=
-      - IMMICH_API_KEY=
-      - TELEGRAM_BOT_TOKEN=
-      - ALLOWED_USER_IDS=
-      - TZ=America/Los_Angeles
+    env_file:
+      - .env
     image: ghcr.io/rgr4y/telegram-immich-bot
     build:
       context: .
     restart: unless-stopped
+    depends_on:
+      - telegram-bot-api
+
+  telegram-bot-api:
+    env_file:
+      - .env
+    image: aiogram/telegram-bot-api:latest
+    container_name: telegram-bot-api
+    environment:
+      - TELEGRAM_API_ID=${TELEGRAM_API_ID}
+      - TELEGRAM_API_HASH=${TELEGRAM_API_HASH}
+    volumes:
+      - telegram-bot-api-data:/var/lib/telegram-bot-api
+    ports:
+      - "8081:8081"
+    restart: unless-stopped
+
+volumes:
+  telegram-bot-api-data:
 

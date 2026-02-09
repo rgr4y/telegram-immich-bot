@@ -36,7 +36,29 @@ This Docker container provides a simple way to automatically upload files from T
 3. **Run the container and send a file!**
 This image is available both on [Docker Hub](https://hub.docker.com/r/myanesp/telegram-immich-bot) and [GitHub Container Registry](https://github.com/myanesp/telegram-immich-bot), so you're free to choose from which one you're going to download the image. Edit the following docker compose/docker run command to match your needs and you are ready to go! Remember to send the image(s) as File/Documents and not as Picture to preserve all metadata.
 
-### Run with Docker Compose
+### Run with Docker Compose (Using .env file - Recommended)
+
+1. Copy the `.env.example` file to `.env`:
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Edit the `.env` file with your configuration:
+   ```bash
+   nano .env  # or use your favorite editor
+   ```
+
+3. Start the services:
+   ```bash
+   docker-compose up -d
+   ```
+
+The `docker-compose.yml` file is already configured to use the `.env` file. If you want to enable support for files larger than 20MB, you'll need to:
+- Get your `TELEGRAM_API_ID` and `TELEGRAM_API_HASH` from https://my.telegram.org/apps
+- Set `TELEGRAM_API_URL=http://telegram-bot-api:8081` in your `.env` file
+- The `telegram-bot-api` service will automatically start and handle large files
+
+### Run with Docker Compose (Inline Configuration)
 
 ```yaml
 services:
@@ -72,6 +94,23 @@ docker run -d \
 | IMMICH_API_URL | ✅ | Full URL to your Immich API endpoint (can be local or public) (e.g., `http://your-immich-instance:2283/api`) | - |
 | IMMICH_API_KEY | ✅ | API key for authenticating with your Immich instance | - |
 | ALLOWED_USER_IDS | ✅ | Comma-separated list of Telegram user IDs allowed to use the bot (e.g., `123456789,987654321`) | - |
+| TELEGRAM_API_ID | ❌ | Your Telegram API ID from https://my.telegram.org/apps (required for files >20MB) | - |
+| TELEGRAM_API_HASH | ❌ | Your Telegram API Hash from https://my.telegram.org/apps (required for files >20MB) | - |
+| TELEGRAM_API_URL | ❌ | URL to local Telegram Bot API server (e.g., `http://telegram-bot-api:8081`) | - |
+| LOG_LEVEL | ❌ | Logging level (DEBUG, INFO, WARNING, ERROR) | INFO |
+| BOT_NAME | ❌ | Custom name for your bot | Telegram to Immich Bot |
+
+## Handling Large Files (>20MB)
+
+By default, Telegram's Bot API has a 20MB file size limit. To handle larger files (up to 2GB), you need to use a local Telegram Bot API server:
+
+1. Get your `TELEGRAM_API_ID` and `TELEGRAM_API_HASH` from https://my.telegram.org/apps
+2. Add them to your `.env` file
+3. Set `TELEGRAM_API_URL=http://telegram-bot-api:8081` in your `.env` file
+4. The included `docker-compose.yml` already includes the `telegram-bot-api` service
+5. Start your services with `docker-compose up -d`
+
+The bot will automatically detect the local API server and increase the file size limit to 2GB.
 
 ## Planned features
 

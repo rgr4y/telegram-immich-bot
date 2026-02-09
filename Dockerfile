@@ -1,4 +1,7 @@
 FROM python:3.13-slim
+
+ENV DEBIAN_FRONTEND=noninteractive
+
 WORKDIR /app
 
 # runtime libs
@@ -20,6 +23,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # remove build deps
 RUN apt-get purge -y --auto-remove \
   build-essential python3-dev \
-  zlib1g-dev libjpeg62-turbo-dev libwebp-dev libtiff-dev libopenjp2-7-dev
+  zlib1g-dev libjpeg62-turbo-dev libwebp-dev libtiff-dev libopenjp2-7-dev && \
+  rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /usr/share/doc /usr/share/man /usr/share/locale
 
 CMD ["python", "bot.py"]

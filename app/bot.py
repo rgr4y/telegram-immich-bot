@@ -44,7 +44,7 @@ def validate_config():
 IMMICH_API_URL = os.getenv("IMMICH_API_URL", "http://your-immich-instance.ltd/api")
 IMMICH_API_KEY = os.getenv("IMMICH_API_KEY", "")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
-TELEGRAM_API_URL = os.getenv("TELEGRAM_API_URL") # Optional, for local bot api server
+TELEGRAM_API_URL = os.getenv("TELEGRAM_API_URL") # Optional, for local bot API server
 
 allowed_user_ids = os.getenv("ALLOWED_USER_IDS")
 if not allowed_user_ids:

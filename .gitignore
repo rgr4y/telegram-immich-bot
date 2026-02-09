@@ -1,3 +1,6 @@
 venv
 run_dev.sh
 .env
+__pycache__/
+*.pyc
+.pytest_cache/

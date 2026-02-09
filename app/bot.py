@@ -207,24 +207,74 @@ async def get_immich_status():
 
     return immich_status, user_info
 
+async def check_connectivity_job(context: ContextTypes.DEFAULT_TYPE):
+    """Periodic job to check connections and notify admins on status change."""
+    
+    # Check Immich Connection
+    is_immich_ok = check_immich_connection()
+    
+    # Check Telegram Connection
+    is_tg_ok = True
+    try:
+        await context.bot.get_me()
+    except Exception:
+        is_tg_ok = False
+
+    # Get previous states (defaulting to True to avoid noise on startup if already handled)
+    prev_immich_status = context.bot_data.get('immich_status', True)
+    prev_tg_status = context.bot_data.get('telegram_status', True)
+
+    # Immich Logic
+    if is_immich_ok != prev_immich_status:
+        context.bot_data['immich_status'] = is_immich_ok
+        status_msg = "✅ Immich connection restored!" if is_immich_ok else "❌ Lost connection to Immich server!"
+        logger.warning(status_msg)
+        
+        for user_id in ALLOWED_USER_IDS:
+            try:
+                await context.bot.send_message(chat_id=user_id, text=f"⚠️ Connectivity Alert:\n{status_msg}")
+            except Exception as e:
+                logger.error(f"Failed to send connectivity alert to {user_id}: {e}")
+
+    # Telegram Logic
+    if is_tg_ok != prev_tg_status:
+        context.bot_data['telegram_status'] = is_tg_ok
+        status_msg = "✅ Telegram API connection restored!" if is_tg_ok else "❌ Lost connection to Telegram API!"
+        logger.warning(status_msg)
+        
+        if is_tg_ok: # Only send if we are connected now
+            for user_id in ALLOWED_USER_IDS:
+                try:
+                    await context.bot.send_message(chat_id=user_id, text=f"⚠️ Connectivity Alert:\n{status_msg}")
+                except Exception as e:
+                    logger.error(f"Failed to send connectivity alert to {user_id}: {e}")
+
 async def send_startup_message(application: Application):
     """Send startup message to all allowed users when container starts."""
     immich_status, user_info = await get_immich_status()
 
-    if "Connected" in immich_status:
-        logger.info("==========================================================")
-        logger.info(f"✅ CONNECTION SUCCESSFUL: Linked to Immich instance")
-        logger.info(f"   URL: {IMMICH_API_URL}")
-        logger.info(f"   User: {user_info}") 
-        logger.info("==========================================================")
-    else:
-        logger.error("==========================================================")
-        logger.error(f"❌ CONNECTION FAILED: Could not link to Immich instance")
-        logger.error(f"   Status: {immich_status}") 
-        logger.error("==========================================================")
+    # Check Telegram connection
+    telegram_status = "❌ Telegram API Disconnected"
+    try:
+        await application.bot.get_me()
+        if TELEGRAM_API_URL:
+            telegram_status = f"✅ Connected to Local API at {TELEGRAM_API_URL}"
+        else:
+            telegram_status = "✅ Connected to Telegram Cloud API"
+    except Exception as e:
+        telegram_status = f"❌ Telegram API Connection Failed: {e}"
+        logger.error(f"Startup Telegram check failed: {e}")
+
+    logger.info("==========================================================")
+    logger.info(f"STARTUP STATUS CHECKS:")
+    logger.info(f"   {telegram_status}")
+    logger.info(f"   {immich_status}")
+    logger.info(f"   User: {user_info}") 
+    logger.info("==========================================================")
 
     startup_message = (
         f"🤖 {BOT_NAME} v{BOT_VERSION} has started!\n\n"
+        f"{telegram_status}\n"
         f"{immich_status}\n"
         f"Logged in as {user_info}\n\n"
         "Bot is ready to receive your files."
@@ -241,6 +291,10 @@ async def send_startup_message(application: Application):
             logger.info(f"Successfully sent startup message to user {user_id}")
         except Exception as e:
             logger.error(f"Failed to send startup message to user {user_id}: {e}")
+            
+    # Initialize bot_data for monitoring
+    application.bot_data['immich_status'] = "✅" in immich_status
+    application.bot_data['telegram_status'] = "✅" in telegram_status
 
 async def send_shutdown_message(application: Application):
     """Send shutdown message to allowed users."""
@@ -289,7 +343,7 @@ async def upload_to_immich(update: Update, file_path: str, file_name: str, file_
     """Helper to upload a file to Immich."""
     try:
         file_size = os.path.getsize(file_path)
-        logger.debug(f"Processing {file_type} file: {file_name} ({file_size} bytes)")
+        logger.debug(f"Processing {file_type} file: {file_name} ({file_size / (1024 * 1024):.2f} MB)")
 
         # Determine creation date
         # Priority:
@@ -356,10 +410,18 @@ async def upload_to_immich(update: Update, file_path: str, file_name: str, file_
                 response_data = response.json()
                 if response.status_code == 200 and response_data.get('status') == 'duplicate':
                     logger.info(f"{file_type.capitalize()} {file_name} is a duplicate in Immich")
-                    await update.message.reply_text(f"ℹ️ {file_type.capitalize()} already exists in Immich.")
+                    try:
+                        await update.message.set_reaction("🥱")
+                    except Exception as e:
+                        # Fallback if reaction fails (e.g. older telegram version)
+                        await update.message.reply_text(f"ℹ️ {file_type.capitalize()} already exists in Immich.")
                 else:
                     logger.info(f"Successfully uploaded {file_type} {file_name} to Immich")
-                    await update.message.reply_text(f"✅ {file_type.capitalize()} uploaded successfully!")
+                    try:
+                        await update.message.set_reaction("👍")
+                    except Exception as e:
+                        # Fallback if reaction fails
+                        await update.message.reply_text(f"✅ {file_type.capitalize()} uploaded successfully!")
             else:
                 logger.error(f"Failed to upload {file_type} {file_name} to Immich. Status code: {response.status_code}, Response: {response.text}")
                 await update.message.reply_text(f"❌ Failed to upload {file_type}. Error: {response.text}")
@@ -503,7 +565,7 @@ async def handle_video(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Use file_name if available, otherwise generate one
     file_name = getattr(video, 'file_name', None) or f"video_{file_id}.mp4"
     
-    logger.info(f"Processing video upload from user {username} (ID: {user_id}): {file_name}")
+    logger.info(f"Processing video upload from user {username} (ID: {user_id}): {file_name} ({video.file_size / (1024 * 1024):.2f} MB)")
 
     temp_file_path = f"/tmp/{file_id}_{file_name}"
 
@@ -559,8 +621,19 @@ def main():
         builder = Application.builder().token(TELEGRAM_BOT_TOKEN).post_stop(send_shutdown_message)
         
         if TELEGRAM_API_URL:
-            builder.base_url(TELEGRAM_API_URL)
-            logger.info(f"Using local Telegram API URL: {TELEGRAM_API_URL}")
+            # Ensure the base URL ends with /bot as required by python-telegram-bot
+            api_url = TELEGRAM_API_URL
+            if not api_url.endswith('/bot'):
+                api_url = f"{api_url.rstrip('/')}/bot"
+            
+            builder.base_url(api_url)
+            # Increase connection timeout for local server downloads/uploads
+            builder.read_timeout(300) 
+            builder.write_timeout(300)
+            builder.connect_timeout(60)
+            builder.pool_timeout(60)
+            
+            logger.info(f"Using local Telegram API URL: {api_url}")
             
         application = builder.build()
 
@@ -572,6 +645,11 @@ def main():
         application.add_handler(MessageHandler(filters.PHOTO, handle_photo))
         application.add_handler(MessageHandler(filters.VIDEO, handle_video))
         application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+
+        if application.job_queue:
+            # Check connectivity every 5 minutes (300s), starting 1 minute after boot
+            application.job_queue.run_repeating(check_connectivity_job, interval=300, first=60)
+            logger.info("Connectivity monitoring job scheduled")
 
         try:
             loop = asyncio.get_event_loop()
